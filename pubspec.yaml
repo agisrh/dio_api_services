@@ -1,0 +1,38 @@
+name: dio_api_services
+description: "Flutter package for API services with Dio"
+version: 0.0.1
+homepage: https://agisrh.github.io
+repository: https://github.com/agisrh/dio_api_services
+
+platforms:
+  android:
+  ios:
+
+environment:
+  sdk: ">=3.2.6 <4.0.0"
+  flutter: ">=3.3.0"
+
+dependencies:
+  dio: ^5.4.3+1
+  http_parser: ^4.0.2
+  path: ^1.8.3
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.0.2
+
+dev_dependencies:
+  flutter_lints: ^2.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      # This plugin project was generated without specifying any
+      # platforms with the `--platform` argument. If you see the `some_platform` map below, remove it and
+      # then add platforms following the instruction here:
+      # https://flutter.dev/docs/development/packages-and-plugins/developing-packages#plugin-platforms
+      # -------------------
+      some_platform:
+        pluginClass: somePluginClass
+    # -------------------
