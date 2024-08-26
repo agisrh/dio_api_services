@@ -30,8 +30,7 @@ class DioApiService {
         onRequest: (options, handler) {
           options.headers.addAll(
             {
-              if (!options.headers.containsKey("Accept"))
-                'Accept': 'application/json',
+              if (!options.headers.containsKey("Accept")) 'Accept': 'application/json',
             },
           );
 
@@ -63,6 +62,8 @@ class DioApiService {
     Map<String, String>? header,
     bool useFormData = false,
     bool showLog = false,
+    bool showRequestHeader = true,
+    bool showRequestBody = true,
   }) async {
     // Check Internet Connection
     bool isOnline = await ConnectivityStatus.hasNetwork();
@@ -87,8 +88,8 @@ class DioApiService {
       // customization
       _dio.interceptors.add(
         PrettyDioLogger(
-          requestHeader: true,
-          requestBody: true,
+          requestHeader: showRequestHeader,
+          requestBody: showRequestBody,
         ),
       );
     }
