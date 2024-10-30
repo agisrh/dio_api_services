@@ -2,8 +2,8 @@ import 'package:dio/dio.dart';
 export 'package:dio/dio.dart';
 import 'dio_error_util.dart';
 import 'connectivity_status.dart';
+import 'dio_logger_interceptor.dart';
 import 'smart_retry/retry_interceptor.dart';
-import 'package:dio_api_services/dio_logger.dart';
 
 // ignore: constant_identifier_names
 enum MethodRequest { POST, GET, PUT, DELETE }
@@ -61,9 +61,12 @@ class DioApiService {
     dynamic request,
     Map<String, String>? header,
     bool useFormData = false,
-    bool showLog = false,
-    bool showRequestHeader = true,
-    bool showRequestBody = true,
+    bool logRequestUrl = true,
+    bool logRequestHeader = false,
+    bool logRequestBody = false,
+    bool logResponseBody = true,
+    bool logResponseHeader = false,
+    bool logResponseError = true,
   }) async {
     // Check Internet Connection
     bool isOnline = await ConnectivityStatus.hasNetwork();
@@ -83,16 +86,15 @@ class DioApiService {
       _dio.options.headers = header;
     }
 
-    // Show log
-    if (showLog) {
-      // customization
-      _dio.interceptors.add(
-        PrettyDioLogger(
-          requestHeader: showRequestHeader,
-          requestBody: showRequestBody,
-        ),
-      );
-    }
+    // Dio Logger
+    _dio.interceptors.add(LoggerInterceptor(
+      requestUrl: logRequestUrl,
+      requestHeader: logRequestHeader,
+      responseHeader: logResponseHeader,
+      requestBody: logRequestBody,
+      responseBody: logResponseBody,
+      responseError: logResponseError,
+    ));
 
     try {
       Response response;

@@ -28,14 +28,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static DioApiService apiService =
-      DioApiService(baseUrl: 'https://jsonplaceholder.typicode.com/');
+  static DioApiService apiService = DioApiService(baseUrl: 'https://jsonplaceholder.typicode.com/');
 
   Future<Response> methodGET() async {
     var response = await apiService.call(
       'users',
       method: MethodRequest.GET,
-      showLog: true,
     );
     return response;
   }
