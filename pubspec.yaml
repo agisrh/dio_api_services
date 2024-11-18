@@ -1,6 +1,6 @@
 name: dio_api_services
 description: "Flutter package for API services with Dio"
-version: 0.0.2
+version: 0.0.4
 homepage: https://agisrh.github.io
 repository: https://github.com/agisrh/dio_api_services
 

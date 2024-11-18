@@ -6,3 +6,6 @@
 * Add feature check internet status
 * Custom log header request
 * Custom log body request
+
+## 0.0.3
+* Update log request API call
