@@ -21,7 +21,7 @@ Add this package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  dio_api_services: ^0.1.0
+  dio_api_services: ^1.2.0
 ```
 
 Then run:
@@ -37,11 +37,15 @@ flutter pub get
 ```dart
 import 'package:dio_api_services/dio_api_services.dart';
 
-// Initialize the service
+// Initialize the service with optional automatic authentication
 final apiService = DioApiService(
   baseUrl: 'https://api.example.com',
   connectTimeout: Duration(seconds: 30),
   receiveTimeout: Duration(seconds: 30),
+  getToken: () async {
+    // Return your token here (e.g., from secure storage)
+    return 'your_bearer_token';
+  },
 );
 ```
 
@@ -244,6 +248,7 @@ DioApiService({
   required String baseUrl,
   Duration connectTimeout = const Duration(seconds: 90),
   Duration? receiveTimeout = const Duration(seconds: 50),
+  Future<String?> Function()? getToken,
 })
 ```
 
@@ -326,31 +331,16 @@ Future<List<User>> getUsers() async {
 
 ### 3. Authentication
 
-Implement token-based authentication:
+The package now supports automatic token injection through an internal `AuthInterceptor`. Simply provide a `getToken` callback during initialization:
 
 ```dart
-class AuthenticatedApiService {
-  final DioApiService _apiService;
-  String? _token;
-  
-  AuthenticatedApiService(this._apiService);
-  
-  void setToken(String token) => _token = token;
-  
-  Future<Response> authenticatedCall(String url, {
-    MethodRequest method = MethodRequest.GET,
-    dynamic request,
-  }) {
-    return _apiService.call(
-      url,
-      method: method,
-      request: request,
-      header: {
-        if (_token != null) 'Authorization': 'Bearer $_token',
-      },
-    );
-  }
-}
+final apiService = DioApiService(
+  baseUrl: 'https://api.example.com',
+  getToken: () async => await storage.getToken(),
+);
+
+// Every request will now automatically include:
+// Authorization: Bearer <your_token>
 ```
 
 ## Example App

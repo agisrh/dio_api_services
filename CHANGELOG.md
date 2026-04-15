@@ -1,3 +1,7 @@
+## 1.2.0
+* Add `AuthInterceptor` for automatic Bearer token injection
+* Add `getToken` parameter to `DioApiService` constructor
+
 ## 1.1.0
 * Refactor logging system to support dynamic per-call configuration
 * Optimized memory usage by initializing LoggerInterceptor only once

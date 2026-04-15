@@ -5,8 +5,9 @@ import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as p;
 
 /// Creates an instance of [MultipartFile] that can be recreated and reused.
+/// This is required for retrying requests with [FormData].
 class MultipartFileRecreatable extends MultipartFile {
-  /// Default constructor.
+  /// Default constructor for [MultipartFileRecreatable].
   MultipartFileRecreatable(
     super.stream,
     super.length, {

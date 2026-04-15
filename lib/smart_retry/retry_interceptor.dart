@@ -5,13 +5,23 @@ import 'http_status_codes.dart';
 import 'multipart_file_recreatable.dart';
 import 'retry_not_supported_exception.dart';
 
+/// Function signature for evaluating whether a request should be retried.
 typedef RetryEvaluator = FutureOr<bool> Function(
   DioException error,
   int attempt,
 );
 
-/// An interceptor that will try to send failed request again
+/// An interceptor that will try to send failed request again.
 class RetryInterceptor extends Interceptor {
+  /// Creates a [RetryInterceptor].
+  ///
+  /// [dio] is the original dio instance.
+  /// [logPrint] is an optional function for logging.
+  /// [retries] is the maximum number of retry attempts.
+  /// [retryDelays] is the list of durations between retry attempts.
+  /// [retryEvaluator] is an optional function to evaluate retry conditions.
+  /// [ignoreRetryEvaluatorExceptions] if true, exceptions from evaluator are ignored.
+  /// [retryableExtraStatuses] additional HTTP statuses that should trigger a retry.
   RetryInterceptor({
     required this.dio,
     this.logPrint,
@@ -48,16 +58,16 @@ class RetryInterceptor extends Interceptor {
   static const _multipartRetryHelpLink =
       'https://github.com/rodion-m/dio_smart_retry#retry-requests-with-multipartform-data';
 
-  /// The original dio
+  /// The original dio.
   final Dio dio;
 
-  /// For logging purpose
+  /// For logging purpose.
   final void Function(String message)? logPrint;
 
-  /// The number of retry in case of an error
+  /// The number of retry in case of an error.
   final int retries;
 
-  /// Ignore exception if [_retryEvaluator] throws it (not recommend)
+  /// Ignore exception if [_retryEvaluator] throws it (not recommend).
   final bool ignoreRetryEvaluatorExceptions;
 
   /// The delays between attempts.
@@ -83,7 +93,7 @@ class RetryInterceptor extends Interceptor {
   final Set<int> retryableExtraStatuses;
 
   /// Redirects to [DefaultRetryEvaluator.evaluate]
-  ///   with [defaultRetryableStatuses]
+  ///   with [defaultRetryableStatuses].
   static final FutureOr<bool> Function(DioException error, int attempt)
       defaultRetryEvaluator =
       DefaultRetryEvaluator(defaultRetryableStatuses).evaluate;
@@ -217,11 +227,14 @@ class RetryInterceptor extends Interceptor {
 
 const _kDisableRetryKey = 'ro_disable_retry';
 
+/// Extension on [RequestOptions] for managing retry-related metadata.
 extension RequestOptionsX on RequestOptions {
   static const _kAttemptKey = 'ro_attempt';
 
+  /// Current retry attempt number.
   int get attempt => _attempt;
 
+  /// Whether retry is disabled for this request.
   bool get disableRetry => (extra[_kDisableRetryKey] as bool?) ?? false;
 
   set disableRetry(bool value) => extra[_kDisableRetryKey] = value;
@@ -231,7 +244,9 @@ extension RequestOptionsX on RequestOptions {
   set _attempt(int value) => extra[_kAttemptKey] = value;
 }
 
+/// Extension on [Options] for managing retry-related metadata.
 extension OptionsX on Options {
+  /// Whether retry is disabled for this request.
   bool get disableRetry => (extra?[_kDisableRetryKey] as bool?) ?? false;
 
   set disableRetry(bool value) {

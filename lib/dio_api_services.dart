@@ -1,158 +1,283 @@
+// ignore_for_file: constant_identifier_names
+
 import 'package:dio/dio.dart';
 export 'package:dio/dio.dart';
 import 'dio_error_util.dart';
 import 'connectivity_status.dart';
 import 'dio_logger_interceptor.dart';
 import 'smart_retry/retry_interceptor.dart';
+import 'api_exception.dart';
+export 'api_exception.dart';
+export 'auth_interceptor.dart';
 
-// ignore: constant_identifier_names
-enum MethodRequest { POST, GET, PUT, DELETE }
+/// HTTP methods supported by [DioApiService].
+enum MethodRequest {
+  /// HTTP POST method.
+  POST,
 
+  /// HTTP GET method.
+  GET,
+
+  /// HTTP PUT method.
+  PUT,
+
+  /// HTTP DELETE method.
+  DELETE
+}
+
+/// A highly configurable API service built on top of [Dio].
+///
+/// Features include:
+/// - Automatic retry logic
+/// - Connectivity checking
+/// - Pretty logging
+/// - Standardized error handling
 class DioApiService {
-  final Dio _dio = Dio();
-
+  /// Creates a new [DioApiService].
+  ///
+  /// [baseUrl] is the base URL for all requests.
+  /// [dio] can be provided to use an existing Dio instance.
+  /// [interceptors] can be provided to add custom interceptors.
+  /// [checkConnectivity] if true, will check for internet before each request.
+  /// [connectivityChecker] optional custom connectivity check function.
   DioApiService({
     required String baseUrl,
+    Dio? dio,
+    List<Interceptor>? interceptors,
     Duration connectTimeout = const Duration(seconds: 90),
     Duration? receiveTimeout = const Duration(seconds: 50),
-  }) {
-    _dio.options.baseUrl = baseUrl;
-    _dio.options.connectTimeout = connectTimeout;
-    _dio.options.receiveTimeout = receiveTimeout;
-    _dio.options.headers = {
-      'Accept': 'application/json',
-    };
-    _dio.options.receiveDataWhenStatusError = true;
-
-    //Interceptors header
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) {
-          options.headers.addAll(
-            {
-              if (!options.headers.containsKey("Accept")) 'Accept': 'application/json',
-            },
-          );
-
-          return handler.next(options);
-        },
-      ),
-    );
-
-    // Interceptor retry
-    _dio.interceptors.add(
-      RetryInterceptor(
-        dio: _dio,
-        logPrint: print, // specify log function (optional)
-        retries: 3, // retry count (optional)
-        retryDelays: const [
-          // set delays between retries (optional)
-          Duration(seconds: 1), // wait 1 sec before first retry
-          Duration(seconds: 2), // wait 2 sec before second retry
-          Duration(seconds: 3), // wait 3 sec before third retry
-        ],
-      ),
-    );
-
-    // Dio Logger
-    _dio.interceptors.add(LoggerInterceptor());
-  }
-
-  Future<Response> call(
-    String url, {
-    MethodRequest method = MethodRequest.POST,
-    dynamic request,
-    Map<String, String>? header,
-    bool useFormData = false,
+    bool checkConnectivity = true,
+    Future<bool> Function()? connectivityChecker,
+    // Logger settings
     bool logRequestUrl = true,
     bool logRequestHeader = false,
     bool logRequestBody = false,
     bool logResponseBody = true,
     bool logResponseHeader = false,
     bool logResponseError = true,
+  })  : _checkConnectivity = checkConnectivity,
+        _connectivityChecker = connectivityChecker {
+    _dio = dio ?? Dio();
+    _dio.options.baseUrl = baseUrl;
+    _dio.options.connectTimeout = connectTimeout;
+    _dio.options.receiveTimeout = receiveTimeout;
+    _dio.options.headers.addAll({
+      'Accept': 'application/json',
+    });
+    _dio.options.receiveDataWhenStatusError = true;
+
+    // Add custom interceptors if provided
+    if (interceptors != null) {
+      _dio.interceptors.addAll(interceptors);
+    }
+
+    // Default Interceptor for default headers
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (!options.headers.containsKey("Accept")) {
+            options.headers['Accept'] = 'application/json';
+          }
+          return handler.next(options);
+        },
+      ),
+    );
+
+    // Logger Interceptor (Added only once)
+    _dio.interceptors.add(LoggerInterceptor(
+      logRequestUrl: logRequestUrl,
+      logRequestHeader: logRequestHeader,
+      logResponseHeader: logResponseHeader,
+      logRequestBody: logRequestBody,
+      logResponseBody: logResponseBody,
+      logResponseError: logResponseError,
+    ));
+
+    // Retry Interceptor
+    _dio.interceptors.add(
+      RetryInterceptor(
+        dio: _dio,
+        logPrint: (message) => logDebug(message, level: Level.debug),
+        retries: 3,
+        retryDelays: const [
+          Duration(seconds: 1),
+          Duration(seconds: 2),
+          Duration(seconds: 3),
+        ],
+      ),
+    );
+  }
+
+  late final Dio _dio;
+  final bool _checkConnectivity;
+  final Future<bool> Function()? _connectivityChecker;
+
+  /// Makes an API call to the specified [url].
+  ///
+  /// [method] defaults to [MethodRequest.POST].
+  /// [request] can be a [Map] or [FormData], it will be sent as the body.
+  /// [header] additional headers for this specific call.
+  /// [queryParameters] GET parameters.
+  /// [options] additional [Options] for the request.
+  /// [cancelToken] used to cancel the request.
+  Future<Response> call(
+    String url, {
+    MethodRequest method = MethodRequest.POST,
+    dynamic request,
+    Map<String, dynamic>? header,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+    bool useFormData = false,
+    bool? logRequestUrl,
+    bool? logRequestHeader,
+    bool? logRequestBody,
+    bool? logResponseBody,
+    bool? logResponseHeader,
+    bool? logResponseError,
   }) async {
     // Check Internet Connection
-    bool isOnline = await ConnectivityStatus.hasNetwork();
-    if (isOnline != true) {
-      Response response = Response(
-        data: {
-          "message": "You're offline. Check your connection",
-        },
-        statusCode: 00,
-        requestOptions: RequestOptions(path: ''),
-      );
-      return response;
+    if (_checkConnectivity) {
+      final isOnline = _connectivityChecker != null
+          ? await _connectivityChecker()
+          : await ConnectivityStatus.hasNetwork();
+      if (!isOnline) {
+        throw NoInternetException();
+      }
     }
 
-    // Add header options
+    // Merge headers and options
+    final requestOptions = options ?? Options();
     if (header != null) {
-      _dio.options.headers = header;
+      requestOptions.headers = (requestOptions.headers ?? {})..addAll(header);
     }
 
-    // Options for this specific call
-    final options = Options(
-      extra: {
-        'logRequestUrl': logRequestUrl,
-        'logRequestHeader': logRequestHeader,
-        'logRequestBody': logRequestBody,
-        'logResponseBody': logResponseBody,
-        'logResponseHeader': logResponseHeader,
-        'logResponseError': logResponseError,
-      },
-    );
+    // Set per-request logging options
+    requestOptions.extra ??= {};
+    if (logRequestUrl != null) requestOptions.extra!['logRequestUrl'] = logRequestUrl;
+    if (logRequestHeader != null) requestOptions.extra!['logRequestHeader'] = logRequestHeader;
+    if (logRequestBody != null) requestOptions.extra!['logRequestBody'] = logRequestBody;
+    if (logResponseBody != null) requestOptions.extra!['logResponseBody'] = logResponseBody;
+    if (logResponseHeader != null) requestOptions.extra!['logResponseHeader'] = logResponseHeader;
+    if (logResponseError != null) requestOptions.extra!['logResponseError'] = logResponseError;
 
     try {
       Response response;
+      final dynamic body =
+          (useFormData && request is Map<String, dynamic>) ? FormData.fromMap(request) : request;
+
       switch (method) {
         case MethodRequest.GET:
           response = await _dio.get(
             url,
-            queryParameters: request,
-            options: options,
+            queryParameters: queryParameters ?? (request is Map<String, dynamic> ? request : null),
+            options: requestOptions,
+            cancelToken: cancelToken,
           );
           break;
         case MethodRequest.PUT:
           response = await _dio.put(
             url,
-            data: useFormData ? FormData.fromMap(request!) : request,
-            options: options,
+            data: body,
+            queryParameters: queryParameters,
+            options: requestOptions,
+            cancelToken: cancelToken,
           );
           break;
         case MethodRequest.DELETE:
           response = await _dio.delete(
             url,
-            data: useFormData ? FormData.fromMap(request!) : request,
-            options: options,
+            data: body,
+            queryParameters: queryParameters,
+            options: requestOptions,
+            cancelToken: cancelToken,
           );
           break;
-        default:
+        case MethodRequest.POST:
           response = await _dio.post(
             url,
-            data: useFormData ? FormData.fromMap(request!) : request,
-            options: options,
+            data: body,
+            queryParameters: queryParameters,
+            options: requestOptions,
+            cancelToken: cancelToken,
           );
+          break;
       }
 
       return response;
     } on DioException catch (e) {
-      if (e.response?.data is Map) {
-        if (!(e.response?.data as Map).containsKey("message")) {
-          (e.response?.data as Map).addAll(<String, dynamic>{
-            "message": DioErrorUtil.handleError(e),
-          });
-        }
+      throw _handleDioError(e);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: e.toString());
+    }
+  }
 
-        return e.response!;
-      } else {
-        Response response = Response(
-          data: {
-            "message": DioErrorUtil.handleError(e),
-          },
-          requestOptions: e.requestOptions,
-          statusCode: e.response?.statusCode,
-        );
-        return response;
+  /// Downloads a file from [url] and saves it to [savePath].
+  ///
+  /// [onReceiveProgress] callback to track download progress.
+  /// [cancelToken] used to cancel the download.
+  Future<Response> download(
+    String url,
+    String savePath, {
+    ProgressCallback? onReceiveProgress,
+    Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
+    Options? options,
+    bool? logRequestUrl,
+    bool? logRequestHeader,
+    bool? logRequestBody,
+    bool? logResponseBody,
+    bool? logResponseHeader,
+    bool? logResponseError,
+  }) async {
+    // Check Internet Connection
+    if (_checkConnectivity) {
+      final isOnline = _connectivityChecker != null
+          ? await _connectivityChecker()
+          : await ConnectivityStatus.hasNetwork();
+      if (!isOnline) {
+        throw NoInternetException();
       }
     }
+
+    try {
+      final requestOptions = options ?? Options();
+      requestOptions.extra ??= {};
+      if (logRequestUrl != null) requestOptions.extra!['logRequestUrl'] = logRequestUrl;
+      if (logRequestHeader != null) requestOptions.extra!['logRequestHeader'] = logRequestHeader;
+      if (logRequestBody != null) requestOptions.extra!['logRequestBody'] = logRequestBody;
+      if (logResponseBody != null) requestOptions.extra!['logResponseBody'] = logResponseBody;
+      if (logResponseHeader != null) requestOptions.extra!['logResponseHeader'] = logResponseHeader;
+      if (logResponseError != null) requestOptions.extra!['logResponseError'] = logResponseError;
+
+      final response = await _dio.download(
+        url,
+        savePath,
+        onReceiveProgress: onReceiveProgress,
+        queryParameters: queryParameters,
+        cancelToken: cancelToken,
+        options: requestOptions,
+      );
+      return response;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: e.toString());
+    }
+  }
+
+  /// Internal error handler to standardize error responses.
+  ApiException _handleDioError(DioException e) {
+    final message = DioErrorUtil.handleError(e);
+    final statusCode = e.response?.statusCode;
+    final data = e.response?.data;
+
+    return ServerResponseException(
+      message: message,
+      statusCode: statusCode,
+      data: data,
+    );
   }
 }

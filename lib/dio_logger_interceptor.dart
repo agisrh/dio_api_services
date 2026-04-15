@@ -3,11 +3,27 @@ import 'package:dio/dio.dart';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 
-// Define an enum for the different log levels
-enum Level { debug, info, warning, error, alien }
+/// Levels of logging for the API services.
+enum Level {
+  /// Detailed debug information.
+  debug,
 
-// Define a logDebug function that logs messages at the specified level
-// log different colors
+  /// General information about the request/response.
+  info,
+
+  /// Warnings about potential issues.
+  warning,
+
+  /// Critical errors.
+  error,
+
+  /// Unexpected or "alien" errors.
+  alien
+}
+
+/// A global function to log messages at specified specified [Level].
+///
+/// Only prints logs when [kDebugMode] is true.
 void logDebug(String message, {Level level = Level.info}) {
   // Define ANSI escape codes for different colors
   const String resetColor = '\x1B[0m';
@@ -42,55 +58,59 @@ void logDebug(String message, {Level level = Level.info}) {
           logMessage = '$redColor[ALIEN][$timeString] $message $resetColor';
           break;
       }
-      //print(logMessage);
       // Use the DebugPrintCallback to ensure long strings are not truncated
       developer.log(logMessage);
     } catch (e) {
-      print(e.toString());
+      debugPrint(e.toString());
     }
   }
 }
 
-// Define an interceptor that logs the requests and responses
+/// An interceptor that logs the requests and responses in a readable format.
 class LoggerInterceptor extends Interceptor {
-  /// Print request [Options]
-  final bool requestUrl;
-
-  /// Print request header [Options.headers]
-  final bool requestHeader;
-
-  /// Print request data [Options.data]
-  final bool requestBody;
-
-  /// Print [Response.data]
-  final bool responseBody;
-
-  /// Print [Response.headers]
-  final bool responseHeader;
-
-  /// Print error message
-  final bool responseError;
-
+  /// Creates a [LoggerInterceptor] with configurable logging options.
   LoggerInterceptor({
-    this.requestUrl = true,
-    this.requestHeader = false,
-    this.requestBody = false,
-    this.responseHeader = false,
-    this.responseBody = true,
-    this.responseError = true,
+    this.logRequestUrl = true,
+    this.logRequestHeader = false,
+    this.logRequestBody = false,
+    this.logResponseHeader = false,
+    this.logResponseBody = true,
+    this.logResponseError = true,
   });
+
+  /// Whether to print the request URL.
+  final bool logRequestUrl;
+
+  /// Whether to print the request headers.
+  final bool logRequestHeader;
+
+  /// Whether to print the request body.
+  final bool logRequestBody;
+
+  /// Whether to print the response body.
+  final bool logResponseBody;
+
+  /// Whether to print the response headers.
+  final bool logResponseHeader;
+
+  /// Whether to print error messages.
+  final bool logResponseError;
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     final options = err.requestOptions;
     final requestPath = '${options.baseUrl}${options.path}';
 
-    final bool logResponseError = options.extra['logResponseError'] ?? responseError;
+    // Check for per-request override
+    final bool currentLogResponseError =
+        options.extra['logResponseError'] ?? logResponseError;
 
     // Log the error request and error message
-    if (logResponseError) {
-      logDebug('onError: ${options.method} request => $requestPath', level: Level.error);
-      logDebug('onError: ${err.error}, Message: ${err.message}', level: Level.debug);
+    if (currentLogResponseError) {
+      logDebug('onError: ${options.method} request => $requestPath',
+          level: Level.error);
+      logDebug('onError: ${err.error}, Message: ${err.message}',
+          level: Level.debug);
     }
 
     // Call the super class to continue handling the error
@@ -101,19 +121,26 @@ class LoggerInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final requestPath = '${options.baseUrl}${options.path}';
 
-    final bool logRequestUrl = options.extra['logRequestUrl'] ?? requestUrl;
-    final bool logRequestHeader = options.extra['logRequestHeader'] ?? requestHeader;
-    final bool logRequestBody = options.extra['logRequestBody'] ?? requestBody;
+    // Check for per-request overrides
+    final bool currentLogRequestUrl =
+        options.extra['logRequestUrl'] ?? logRequestUrl;
+    final bool currentLogRequestHeader =
+        options.extra['logRequestHeader'] ?? logRequestHeader;
+    final bool currentLogRequestBody =
+        options.extra['logRequestBody'] ?? logRequestBody;
 
     // Log request details
-    if (logRequestUrl) {
-      logDebug('onRequest: ${options.method} request => $requestPath', level: Level.info);
+    if (currentLogRequestUrl) {
+      logDebug('onRequest: ${options.method} request => $requestPath',
+          level: Level.info);
     }
-    if (logRequestHeader) {
-      logDebug('onRequest: Request Headers => ${options.headers}', level: Level.info);
+    if (currentLogRequestHeader) {
+      logDebug('onRequest: Request Headers => ${options.headers}',
+          level: Level.info);
     }
-    if (logRequestBody) {
-      logDebug('onRequest: Request Data => ${_prettyJsonEncode(options.data)}', level: Level.info);
+    if (currentLogRequestBody) {
+      logDebug('onRequest: Request Data => ${_prettyJsonEncode(options.data)}',
+          level: Level.info);
     }
 
     // Call the super class to continue handling the request
@@ -124,17 +151,21 @@ class LoggerInterceptor extends Interceptor {
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     final options = response.requestOptions;
 
-    final bool logResponseBody = options.extra['logResponseBody'] ?? responseBody;
-    final bool logResponseHeader = options.extra['logResponseHeader'] ?? responseHeader;
+    // Check for per-request overrides
+    final bool currentLogResponseBody =
+        options.extra['logResponseBody'] ?? logResponseBody;
+    final bool currentLogResponseHeader =
+        options.extra['logResponseHeader'] ?? logResponseHeader;
 
     // Log the response status code and data
-    if (logResponseBody) {
-      logDebug('onResponse: StatusCode: ${response.statusCode}, Data: ${_prettyJsonEncode(response.data)}',
-          level: Level.debug); // Log formatted response data
+    if (currentLogResponseHeader) {
+      logDebug('onResponse: Response Headers => ${response.headers}',
+          level: Level.debug);
     }
-
-    if (logResponseHeader) {
-      logDebug('onResponse: Response Headers => ${response.headers}', level: Level.info);
+    if (currentLogResponseBody) {
+      logDebug(
+          'onResponse: StatusCode: ${response.statusCode}, Data: ${_prettyJsonEncode(response.data)}',
+          level: Level.debug); // Log formatted response data
     }
 
     // Call the super class to continue handling the response

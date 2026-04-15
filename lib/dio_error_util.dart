@@ -1,37 +1,50 @@
 import 'package:dio/dio.dart';
 
+/// Utility class for handling [DioException] and converting them to human-readable messages.
 class DioErrorUtil {
-  // general methods:------------------------------------------------------------
+  /// Converts a [DioException] into a user-friendly error string.
   static String handleError(DioException error) {
-    String errorDescription = "";
     switch (error.type) {
       case DioExceptionType.cancel:
-        errorDescription = "Request to API server was cancelled";
-        break;
+        return "Request to the server was cancelled.";
       case DioExceptionType.connectionTimeout:
-        errorDescription = "Connection timeout with API server";
-        break;
+        return "Connection timed out. Please check your internet.";
       case DioExceptionType.connectionError:
-        errorDescription =
-            "Connection to API server failed due to internet connection";
-        break;
+        return "Failed to connect to the server. Check your internet connection.";
       case DioExceptionType.receiveTimeout:
-        errorDescription = "Receive timeout in connection with API server";
-        break;
-      case DioExceptionType.badResponse:
-        errorDescription =
-            "Received invalid status code: ${error.response?.statusCode}";
-        break;
+        return "Server did not respond in time (Receive timeout).";
       case DioExceptionType.sendTimeout:
-        errorDescription = "Send timeout in connection with API server";
-        break;
+        return "Request took too long to send (Send timeout).";
+      case DioExceptionType.badResponse:
+        final statusCode = error.response?.statusCode;
+        if (statusCode != null) {
+          switch (statusCode) {
+            case 400:
+              return "Bad request. Please check your data.";
+            case 401:
+              return "Unauthorized access. Please login again.";
+            case 403:
+              return "Forbidden. You don't have permission.";
+            case 404:
+              return "Resource not found on the server.";
+            case 500:
+              return "Internal server error. Please try again later.";
+            case 502:
+              return "Bad gateway. Server is currently unavailable.";
+            case 503:
+              return "Service unavailable. Server might be down.";
+            default:
+              return "Received invalid status code: $statusCode";
+          }
+        }
+        return "Received an invalid response from the server.";
       case DioExceptionType.badCertificate:
-        errorDescription = "Your connection is not secure";
-        break;
+        return "SSL certificate validation failed. Connection is not secure.";
       case DioExceptionType.unknown:
-        errorDescription = "Unexpected error occured";
-        break;
+        if (error.message != null && error.message!.contains("SocketException")) {
+          return "No internet connection or server unreachable.";
+        }
+        return "An unexpected error occurred.";
     }
-    return errorDescription;
   }
 }
