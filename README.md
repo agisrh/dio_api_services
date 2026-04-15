@@ -21,7 +21,7 @@ Add this package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  dio_api_services: ^0.0.3
+  dio_api_services: ^0.1.0
 ```
 
 Then run:

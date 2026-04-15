@@ -53,6 +53,9 @@ class DioApiService {
         ],
       ),
     );
+
+    // Dio Logger
+    _dio.interceptors.add(LoggerInterceptor());
   }
 
   Future<Response> call(
@@ -86,38 +89,47 @@ class DioApiService {
       _dio.options.headers = header;
     }
 
-    // Dio Logger
-    _dio.interceptors.add(LoggerInterceptor(
-      requestUrl: logRequestUrl,
-      requestHeader: logRequestHeader,
-      responseHeader: logResponseHeader,
-      requestBody: logRequestBody,
-      responseBody: logResponseBody,
-      responseError: logResponseError,
-    ));
+    // Options for this specific call
+    final options = Options(
+      extra: {
+        'logRequestUrl': logRequestUrl,
+        'logRequestHeader': logRequestHeader,
+        'logRequestBody': logRequestBody,
+        'logResponseBody': logResponseBody,
+        'logResponseHeader': logResponseHeader,
+        'logResponseError': logResponseError,
+      },
+    );
 
     try {
       Response response;
       switch (method) {
         case MethodRequest.GET:
-          response = await _dio.get(url, queryParameters: request);
+          response = await _dio.get(
+            url,
+            queryParameters: request,
+            options: options,
+          );
           break;
         case MethodRequest.PUT:
           response = await _dio.put(
             url,
             data: useFormData ? FormData.fromMap(request!) : request,
+            options: options,
           );
           break;
         case MethodRequest.DELETE:
           response = await _dio.delete(
             url,
             data: useFormData ? FormData.fromMap(request!) : request,
+            options: options,
           );
           break;
         default:
           response = await _dio.post(
             url,
             data: useFormData ? FormData.fromMap(request!) : request,
+            options: options,
           );
       }
 

@@ -1,3 +1,8 @@
+## 1.1.0
+* Refactor logging system to support dynamic per-call configuration
+* Optimized memory usage by initializing LoggerInterceptor only once
+* Added support for response header logging
+
 ## 0.0.1
 
 * TODO: Describe initial release.
